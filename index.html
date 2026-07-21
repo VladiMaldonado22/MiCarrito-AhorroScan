@@ -3,299 +3,432 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Ticket — Sumá lo que gastás</title>
+<title>VladiScan — Controlá tu carrito en el súper</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-  :root{
-    --paper:#FAF7F0;
-    --paper-dark:#EFEAE0;
-    --ink:#1C1B19;
-    --ink-soft:#6E685E;
-    --stamp:#C1272D;
-    --highlight:#F2C230;
-    --line: rgba(28,27,25,0.14);
-    --radius: 2px;
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{
-    background:var(--paper-dark);
-    font-family:'IBM Plex Mono', monospace;
-    color:var(--ink);
-    min-height:100vh;
-    display:flex;
-    justify-content:center;
-    padding:24px 12px 60px;
-  }
-  .receipt{
-    width:100%;
-    max-width:420px;
-    background:var(--paper);
-    box-shadow: 0 20px 40px rgba(0,0,0,0.18);
-    position:relative;
-  }
-  .receipt::before{
-    content:"";
-    position:absolute;
-    top:-8px; left:0; right:0; height:16px;
-    background-image: radial-gradient(circle at 8px 8px, var(--paper-dark) 6px, transparent 6.5px);
-    background-size: 16px 16px;
-    background-position: center;
-  }
-  header{
-    padding:22px 22px 14px;
-    text-align:center;
-    border-bottom:2px dashed var(--line);
-  }
-  header .eyebrow{
-    font-family:'Space Grotesk', sans-serif;
-    font-size:11px;
-    letter-spacing:0.18em;
-    color:var(--ink-soft);
-    text-transform:uppercase;
-  }
-  header h1{
-    font-family:'Space Grotesk', sans-serif;
-    font-size:26px;
-    font-weight:700;
-    margin:6px 0 2px;
-    letter-spacing:-0.01em;
-  }
-  header .sub{
-    font-size:12px;
-    color:var(--ink-soft);
+  :root {
+    --bg-gradient: linear-gradient(135deg, #eef2ff 0%, #f3e8ff 50%, #e0f2fe 100%);
+    --card-bg: #ffffff;
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --accent-green: #10b981;
+    --accent-green-soft: #d1fae5;
+    --accent-amber: #f59e0b;
+    --danger: #ef4444;
+    --text-main: #1e293b;
+    --text-muted: #64748b;
+    --line: #e2e8f0;
+    --radius: 12px;
   }
 
-  .scan-zone{ padding:16px 16px 8px; }
-  .viewfinder{
-    position:relative;
-    width:100%;
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  
+  body {
+    background: var(--bg-gradient);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: var(--text-main);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 20px 12px 60px;
+  }
+
+  .receipt {
+    width: 100%;
+    max-width: 440px;
+    background: var(--card-bg);
+    border-radius: 20px;
+    box-shadow: 0 20px 40px -15px rgba(79, 70, 229, 0.15), 0 0 1px 1px rgba(0, 0, 0, 0.05);
+    position: relative;
+    overflow: hidden;
+  }
+
+  header {
+    padding: 24px 22px 18px;
+    text-align: center;
+    background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+    border-bottom: 2px dashed var(--line);
+    position: relative;
+  }
+
+  header .brand-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #e0e7ff;
+    color: var(--primary);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  header h1 {
+    font-size: 32px;
+    font-weight: 800;
+    margin: 0 0 4px;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, #312e81, #4f46e5);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  header .sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .scan-zone { padding: 18px 18px 10px; }
+  
+  .viewfinder {
+    position: relative;
+    width: 100%;
     aspect-ratio: 4/3;
-    background:#0d0d0c;
-    overflow:hidden;
-    border-radius:var(--radius);
-  }
-  video, canvas{
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    display:block;
-  }
-  canvas{ display:none; }
-  .viewfinder .frame{
-    position:absolute;
-    inset:32% 10%;
-    border:2px solid var(--highlight);
-    border-radius:4px;
-    pointer-events:none;
-  }
-  .viewfinder .frame .tag{
-    position:absolute;
-    top:-20px; left:0;
-    font-size:10px;
-    color:var(--highlight);
-    letter-spacing:0.05em;
-    background:rgba(0,0,0,0.5);
-    padding:2px 5px;
-  }
-  .cam-status{
-    position:absolute;
-    bottom:8px; left:8px; right:8px;
-    font-size:11px;
-    color:#F4EFE4;
-    background:rgba(0,0,0,0.55);
-    padding:6px 8px;
-    border-radius:2px;
-    text-align:center;
-    letter-spacing:0.02em;
-  }
-  .cam-off{
-    width:100%; height:100%;
-    display:flex; align-items:center; justify-content:center;
-    color:#B8B2A6; font-size:12px; text-align:center; padding:20px;
+    background: #0f172a;
+    overflow: hidden;
+    border-radius: var(--radius);
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
   }
 
-  .capture-row{
-    display:flex; gap:8px; margin-top:10px;
+  video, canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
   }
-  #captureBtn{
-    flex:1;
-    padding:12px;
-    font-size:13px;
-  }
-  .manual-toggle{
-    display:block;
-    text-align:center;
-    font-size:11px;
-    color:var(--ink-soft);
-    text-decoration:underline;
-    margin-top:10px;
-    background:none;
-  }
-  .manual-row{
-    display:none;
-    gap:8px;
-    margin-top:10px;
-  }
-  .manual-row.open{ display:flex; }
-  .manual-row input{
-    flex:1;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:13px;
-    padding:9px 10px;
-    border:1px solid var(--line);
-    background:#fff;
-    border-radius:var(--radius);
+  canvas { display: none; }
+
+  .viewfinder .frame {
+    position: absolute;
+    inset: 28% 10%;
+    border: 2px solid var(--accent-green);
+    border-radius: 8px;
+    pointer-events: none;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+    overflow: hidden;
   }
 
-  button{
-    font-family:'Space Grotesk', sans-serif;
-    font-weight:600;
-    cursor:pointer;
-    border:none;
-    border-radius:var(--radius);
-  }
-  .btn-primary{
-    background:var(--ink);
-    color:var(--paper);
-    padding:9px 14px;
-    font-size:12px;
-    letter-spacing:0.03em;
-  }
-  .btn-primary:active{ transform: translateY(1px); }
-  .btn-primary:disabled{ opacity:0.5; cursor:default; }
-
-  .items{ padding:6px 22px 4px; min-height:60px; }
-  .empty-state{
-    text-align:center;
-    color:var(--ink-soft);
-    font-size:12px;
-    padding:30px 10px;
-    border:1px dashed var(--line);
-    margin-top:14px;
-    border-radius:var(--radius);
-  }
-  .item-row{
-    display:flex;
-    justify-content:space-between;
-    align-items:baseline;
-    gap:10px;
-    padding:9px 0;
-    border-bottom:1px dotted var(--line);
-    font-size:13px;
-    animation: printIn 0.28s ease;
-  }
-  @keyframes printIn{
-    from{ opacity:0; transform:translateY(-6px);}
-    to{ opacity:1; transform:translateY(0);}
-  }
-  .item-row .name{
-    flex:1; min-width:0;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    color:var(--ink-soft);
-  }
-  .item-row .price{ font-weight:600; white-space:nowrap; }
-  .item-row .remove{
-    background:none; border:none; color:var(--stamp);
-    font-size:14px; line-height:1; padding:0 0 0 6px; cursor:pointer;
+  /* Animación del láser escáner */
+  .viewfinder .frame::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--accent-green), transparent);
+    box-shadow: 0 0 8px var(--accent-green);
+    animation: scanLine 2s infinite ease-in-out;
   }
 
-  .total-block{
-    margin:8px 22px 0;
-    padding-top:14px;
-    border-top:2px dashed var(--line);
-  }
-  .total-line{
-    display:flex; justify-content:space-between;
-    font-size:12px; color:var(--ink-soft); padding:3px 0;
-  }
-  .total-line.grand{
-    font-family:'Space Grotesk', sans-serif;
-    font-size:26px; font-weight:700; color:var(--ink);
-    padding-top:8px;
+  @keyframes scanLine {
+    0% { top: 0%; }
+    50% { top: 96%; }
+    100% { top: 0%; }
   }
 
-  footer{ padding:18px 22px 24px; text-align:center; }
-  .barcode-deco{
-    height:26px;
-    background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 5px, var(--ink) 5px 6px, transparent 6px 9px);
-    opacity:0.85;
-    margin-bottom:14px;
-  }
-  .footer-actions{ display:flex; gap:10px; }
-  .footer-actions button{ flex:1; padding:10px; font-size:12px; }
-  .btn-secondary{ background:var(--paper-dark); color:var(--ink); }
-
-  .modal-overlay{
-    position:fixed; inset:0;
-    background:rgba(20,18,15,0.5);
-    display:flex; align-items:flex-end; justify-content:center;
-    z-index:50;
-  }
-  .modal{
-    background:var(--paper);
-    width:100%; max-width:420px;
-    border-radius:12px 12px 0 0;
-    padding:20px 22px 26px;
-    box-shadow: 0 -10px 30px rgba(0,0,0,0.25);
-  }
-  .modal .eyebrow{ font-size:11px; color:var(--ink-soft); letter-spacing:0.1em; }
-  .modal h2{
-    font-family:'Space Grotesk', sans-serif;
-    font-size:15px; margin:4px 0 14px; color:var(--ink-soft); font-weight:500;
-  }
-  .modal label{
-    display:block; font-size:11px; color:var(--ink-soft);
-    margin-bottom:4px; margin-top:12px;
-  }
-  .modal input{
-    width:100%;
-    font-family:'IBM Plex Mono', monospace;
-    font-size:15px;
-    padding:10px 12px;
-    border:1px solid var(--line);
-    border-radius:var(--radius);
-  }
-  #modalPrice{ font-size:24px; font-weight:700; }
-  .modal-actions{ display:flex; gap:10px; margin-top:18px; }
-  .modal-actions button{ flex:1; padding:11px; font-size:13px; }
-
-  .thumb-preview{
-    width:100%;
-    max-height:110px;
-    object-fit:cover;
-    border-radius:4px;
-    margin-top:8px;
-    border:1px solid var(--line);
+  .viewfinder .frame .tag {
+    position: absolute;
+    top: 6px; left: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--accent-green);
+    letter-spacing: 0.05em;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(4px);
+    padding: 3px 7px;
+    border-radius: 4px;
+    text-transform: uppercase;
   }
 
-  @media (prefers-reduced-motion: reduce){ .item-row{ animation:none; } }
+  .cam-status {
+    position: absolute;
+    bottom: 10px; left: 10px; right: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #f8fafc;
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(4px);
+    padding: 8px 10px;
+    border-radius: 6px;
+    text-align: center;
+  }
+
+  .capture-row {
+    display: flex; gap: 8px; margin-top: 12px;
+  }
+
+  button {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    border-radius: var(--radius);
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #4f46e5, #3b82f6);
+    color: #ffffff;
+    padding: 12px 16px;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
+  }
+  .btn-primary:active { transform: translateY(1px); }
+  .btn-primary:disabled { opacity: 0.5; transform: none; box-shadow: none; cursor: not-allowed; }
+
+  #captureBtn { flex: 1; }
+
+  .manual-toggle {
+    display: block;
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-top: 12px;
+    background: none;
+    text-decoration: none;
+  }
+  .manual-toggle:hover { text-decoration: underline; }
+
+  .manual-row {
+    display: none;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .manual-row.open { display: flex; }
+
+  .manual-row input {
+    flex: 1;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 12px;
+    border: 2px solid var(--line);
+    background: #f8fafc;
+    border-radius: var(--radius);
+    color: var(--text-main);
+    outline: none;
+  }
+  .manual-row input:focus { border-color: var(--primary); background: #fff; }
+
+  .items { padding: 6px 22px 10px; min-height: 80px; }
+
+  .empty-state {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 28px 10px;
+    border: 2px dashed var(--line);
+    margin-top: 10px;
+    border-radius: var(--radius);
+    background: #fafafa;
+  }
+
+  .item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font-size: 13px;
+    animation: printIn 0.25s cubic-bezier(0, 0, 0.2, 1);
+  }
+
+  @keyframes printIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .item-row .name {
+    flex: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-weight: 600;
+    color: var(--text-main);
+  }
+
+  .item-row .price {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 14px;
+    background: var(--accent-green-soft);
+    color: #065f46;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+  }
+
+  .item-row .remove {
+    background: #fee2e2;
+    border: none;
+    color: var(--danger);
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .item-row .remove:hover { background: var(--danger); color: #fff; }
+
+  .total-block {
+    margin: 8px 18px 0;
+    padding: 16px;
+    background: linear-gradient(135deg, #1e1b4b, #312e81);
+    border-radius: var(--radius);
+    color: #fff;
+    box-shadow: 0 10px 20px -5px rgba(49, 46, 129, 0.3);
+  }
+
+  .total-line {
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: #c7d2fe; font-weight: 600; padding: 2px 0;
+  }
+
+  .total-line.grand {
+    font-size: 28px;
+    font-weight: 800;
+    color: #ffffff;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    margin-top: 6px;
+  }
+
+  .total-line.grand span:last-child {
+    font-family: 'IBM Plex Mono', monospace;
+    color: #34d399;
+  }
+
+  footer { padding: 18px 18px 22px; }
+
+  .footer-actions { display: flex; gap: 10px; }
+  .footer-actions button { flex: 1; padding: 12px; font-size: 13px; }
+
+  .btn-secondary {
+    background: #f1f5f9;
+    color: var(--text-main);
+    border: 1px solid var(--line);
+  }
+  .btn-secondary:hover { background: #e2e8f0; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: flex-end; justify-content: center;
+    z-index: 50;
+  }
+
+  .modal {
+    background: var(--card-bg);
+    width: 100%; max-width: 440px;
+    border-radius: 20px 20px 0 0;
+    padding: 22px 22px 28px;
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
+    animation: slideUp 0.25s ease-out;
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .modal h2 {
+    font-size: 15px; margin: 4px 0 14px;
+    color: var(--text-muted); font-weight: 600;
+  }
+
+  .modal label {
+    display: block; font-size: 12px; font-weight: 700;
+    color: var(--text-main); margin-bottom: 6px; margin-top: 14px;
+  }
+
+  .modal input {
+    width: 100%;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 15px;
+    padding: 12px 14px;
+    border: 2px solid var(--line);
+    border-radius: var(--radius);
+    outline: none;
+  }
+  .modal input:focus { border-color: var(--primary); }
+
+  #modalPrice {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 26px;
+    font-weight: 700;
+    color: #065f46;
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+  }
+
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-actions button { flex: 1; padding: 13px; font-size: 14px; }
+
+  .thumb-preview {
+    width: 100%;
+    max-height: 120px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-top: 10px;
+    border: 2px solid var(--line);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .item-row { animation: none; }
+    .viewfinder .frame::after { animation: none; }
+  }
 </style>
 </head>
 <body>
 
 <div class="receipt">
   <header>
-    <div class="eyebrow">Sesión de compra</div>
-    <h1>Ticket</h1>
-    <div class="sub">Fotografiá el precio de la góndola y sumalo</div>
+    <div class="brand-badge">⚡ VladiScan v2.0</div>
+    <h1>VladiScan</h1>
+    <div class="sub">Escaneá el precio en la góndola y sumá al instante</div>
   </header>
 
   <div class="scan-zone">
     <div class="viewfinder" id="viewfinder">
       <video id="video" playsinline muted></video>
       <canvas id="canvas"></canvas>
-      <div class="frame"><span class="tag">encuadrá el precio acá</span></div>
+      <div class="frame"><span class="tag">Apuntá al precio</span></div>
       <div class="cam-status" id="camStatus">Iniciando cámara…</div>
     </div>
+
     <div class="capture-row">
-      <button class="btn-primary" id="captureBtn" disabled>📷 Leer precio</button>
+      <button class="btn-primary" id="captureBtn" disabled>📷 Leer Precio</button>
     </div>
-    <button class="manual-toggle" id="manualToggle">o cargar el precio a mano</button>
+
+    <button class="manual-toggle" id="manualToggle">✏️ Cargar precio manualmente</button>
     <div class="manual-row" id="manualRow">
       <input type="number" id="manualPrice" placeholder="0.00" inputmode="decimal" step="0.01">
       <button class="btn-primary" id="manualAdd">Agregar</button>
@@ -303,38 +436,45 @@
   </div>
 
   <div class="items" id="items">
-    <div class="empty-state" id="emptyState">Todavía no sumaste nada.<br>El ticket está vacío.</div>
+    <div class="empty-state" id="emptyState">
+      Tu carrito está vacío.<br>Escaneá un cartel de precio para empezar.
+    </div>
   </div>
 
   <div class="total-block">
-    <div class="total-line"><span>Artículos</span><span id="countLine">0</span></div>
+    <div class="total-line">
+      <span>Productos acumulados</span>
+      <span id="countLine">0</span>
+    </div>
     <div class="total-line grand">
       <span>Total</span>
-      <span>$<span id="grandTotal">0</span></span>
+      <span>$<span id="grandTotal">0.00</span></span>
     </div>
   </div>
 
   <footer>
-    <div class="barcode-deco"></div>
     <div class="footer-actions">
-      <button class="btn-secondary" id="clearAll">vaciar</button>
-      <button class="btn-secondary" id="exportExcel">↓ descargar Excel</button>
+      <button class="btn-secondary" id="clearAll">Vaciar</button>
+      <button class="btn-secondary" id="exportExcel">📊 Exportar Excel</button>
     </div>
   </footer>
 </div>
 
 <div class="modal-overlay" id="modalOverlay" style="display:none;">
   <div class="modal">
-    <div class="eyebrow" id="modalEyebrow">Precio detectado</div>
-    <h2 id="modalHint">Revisá que el número esté bien antes de sumarlo</h2>
+    <div class="eyebrow" id="modalEyebrow">Precio Detectado</div>
+    <h2 id="modalHint">Confirmá o corregí el valor antes de sumar</h2>
     <img id="modalThumb" class="thumb-preview" style="display:none;">
-    <label for="modalPrice">Precio</label>
+    
+    <label for="modalPrice">Precio ($)</label>
     <input type="number" id="modalPrice" placeholder="0.00" inputmode="decimal" step="0.01">
-    <label for="modalNote">Nota (opcional)</label>
-    <input type="text" id="modalNote" placeholder="ej: rollo de cocina">
+    
+    <label for="modalNote">Nombre o nota del artículo (opcional)</label>
+    <input type="text" id="modalNote" placeholder="Ej: Leche entera 1L">
+    
     <div class="modal-actions">
       <button class="btn-secondary" id="modalCancel">Cancelar</button>
-      <button class="btn-primary" id="modalConfirm">Sumar al ticket</button>
+      <button class="btn-primary" id="modalConfirm">Sumar al carrito</button>
     </div>
   </div>
 </div>
@@ -370,9 +510,9 @@
         const row = document.createElement('div');
         row.className = 'item-row';
         row.innerHTML = `
-          <div class="name">${it.note || 'artículo ' + (idx+1)}</div>
+          <div class="name">${it.note || 'Artículo ' + (idx+1)}</div>
           <div class="price">$${formatMoney(it.price)}</div>
-          <button class="remove" data-idx="${idx}" title="quitar">×</button>
+          <button class="remove" data-idx="${idx}" title="Quitar">×</button>
         `;
         itemsEl.appendChild(row);
       });
@@ -391,33 +531,33 @@
   });
 
   document.getElementById('clearAll').addEventListener('click', () => {
-    if(items.length && !confirm('¿Vaciar todo el ticket?')) return;
+    if(items.length && !confirm('¿Vaciar todo el carrito?')) return;
     items.length = 0;
     render();
   });
 
-  // ---- Exportar a Excel ----
+  // Exportar a Excel
   document.getElementById('exportExcel').addEventListener('click', () => {
     if(items.length === 0){
-      alert('Todavía no hay nada para exportar.');
+      alert('Todavía no hay productos para exportar.');
       return;
     }
     const rows = items.map((it, idx) => ({
       '#': idx + 1,
-      'Descripción': it.note || '',
+      'Descripción': it.note || 'Sin especificación',
       'Precio': it.price,
       'Hora': it.time
     }));
-    rows.push({ '#': '', 'Descripción': 'TOTAL', 'Precio': items.reduce((a,i)=>a+i.price,0), 'Hora': '' });
+    rows.push({ '#': '', 'Descripción': 'TOTAL ACUMULADO', 'Precio': items.reduce((a,i)=>a+i.price,0), 'Hora': '' });
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{wch:4},{wch:28},{wch:12},{wch:10}];
+    ws['!cols'] = [{wch:5},{wch:30},{wch:14},{wch:10}];
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Ticket');
+    XLSX.utils.book_append_sheet(wb, ws, 'VladiScan');
     const fecha = new Date().toISOString().slice(0,10);
-    XLSX.writeFile(wb, `ticket-${fecha}.xlsx`);
+    XLSX.writeFile(wb, `vladiscan-compra-${fecha}.xlsx`);
   });
 
-  // ---- Modal ----
+  // Modal
   let pendingThumb = null;
 
   function openModal(guessedPrice, thumbDataUrl){
@@ -430,10 +570,11 @@
     } else {
       modalThumb.style.display = 'none';
     }
-    modalEyebrow.textContent = guessedPrice ? 'Precio detectado — confirmalo' : 'Cargá el precio';
+    modalEyebrow.textContent = guessedPrice ? 'Precio detectado' : 'Cargar precio';
     modalOverlay.style.display = 'flex';
-    setTimeout(() => { modalPrice.focus(); modalPrice.select(); }, 60);
+    setTimeout(() => { modalPrice.focus(); modalPrice.select(); }, 80);
   }
+
   function closeModal(){ modalOverlay.style.display = 'none'; }
 
   document.getElementById('modalCancel').addEventListener('click', closeModal);
@@ -451,13 +592,14 @@
     closeModal();
   });
 
-  // ---- Carga manual (sin cámara) ----
+  // Carga manual
   const manualToggle = document.getElementById('manualToggle');
   const manualRow = document.getElementById('manualRow');
   manualToggle.addEventListener('click', () => {
     manualRow.classList.toggle('open');
     if(manualRow.classList.contains('open')) document.getElementById('manualPrice').focus();
   });
+
   document.getElementById('manualAdd').addEventListener('click', () => {
     const input = document.getElementById('manualPrice');
     const price = parseFloat(input.value);
@@ -466,12 +608,12 @@
     input.value = '';
   });
 
-  // ---- Extraer un precio del texto OCR ----
+  // Extraer precio
   function extractPrice(rawText){
     const cleaned = rawText.replace(/[^\d.,]/g, ' ');
     const matches = cleaned.match(/[\d]{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|\d+/g);
     if(!matches || matches.length === 0) return null;
-    // nos quedamos con el número más largo (suele ser el precio grande del cartel)
+    
     matches.sort((a,b) => b.replace(/[.,]/g,'').length - a.replace(/[.,]/g,'').length);
     let best = matches[0];
 
@@ -479,7 +621,6 @@
     const hasComma = best.includes(',');
     let normalized;
     if(hasDot && hasComma){
-      // el último separador es el decimal
       if(best.lastIndexOf(',') > best.lastIndexOf('.')){
         normalized = best.replace(/\./g, '').replace(',', '.');
       } else {
@@ -494,22 +635,22 @@
     return isNaN(value) ? null : value;
   }
 
-  // ---- Cámara ----
+  // Cámara
   let stream = null;
 
   async function startCamera(){
     if(!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia){
-      camStatus.textContent = 'Este navegador no permite cámara acá. Usá "cargar el precio a mano".';
+      camStatus.textContent = 'Tu navegador no soporta cámara aquí. Usá la carga manual.';
       return;
     }
     try{
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
       video.srcObject = stream;
       await video.play();
-      camStatus.textContent = 'Encuadrá el precio y tocá "Leer precio"';
+      camStatus.textContent = 'Encuadrá el cartel y tocá "Leer Precio"';
       captureBtn.disabled = false;
     } catch(err){
-      camStatus.textContent = 'No se pudo acceder a la cámara (revisá permisos). Usá "cargar el precio a mano".';
+      camStatus.textContent = 'Sin acceso a la cámara. Podés usar la carga manual.';
       console.error(err);
     }
   }
@@ -517,7 +658,7 @@
   captureBtn.addEventListener('click', async () => {
     if(!video.videoWidth) return;
     captureBtn.disabled = true;
-    camStatus.textContent = 'Leyendo… un segundo';
+    camStatus.textContent = 'Escaneando número…';
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -535,7 +676,7 @@
       console.error(err);
       openModal(null, dataUrl);
     } finally {
-      camStatus.textContent = 'Encuadrá el precio y tocá "Leer precio"';
+      camStatus.textContent = 'Encuadrá el cartel y tocá "Leer Precio"';
       captureBtn.disabled = false;
     }
   });
