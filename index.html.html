@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ticket — Sumá lo que gastás</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper:#FAF7F0;
+    --paper-dark:#EFEAE0;
+    --ink:#1C1B19;
+    --ink-soft:#6E685E;
+    --stamp:#C1272D;
+    --highlight:#F2C230;
+    --line: rgba(28,27,25,0.14);
+    --radius: 2px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper-dark);
+    font-family:'IBM Plex Mono', monospace;
+    color:var(--ink);
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:24px 12px 60px;
+  }
+  .receipt{
+    width:100%;
+    max-width:420px;
+    background:var(--paper);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.18);
+    position:relative;
+  }
+  .receipt::before{
+    content:"";
+    position:absolute;
+    top:-8px; left:0; right:0; height:16px;
+    background-image: radial-gradient(circle at 8px 8px, var(--paper-dark) 6px, transparent 6.5px);
+    background-size: 16px 16px;
+    background-position: center;
+  }
+  header{
+    padding:22px 22px 14px;
+    text-align:center;
+    border-bottom:2px dashed var(--line);
+  }
+  header .eyebrow{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:11px;
+    letter-spacing:0.18em;
+    color:var(--ink-soft);
+    text-transform:uppercase;
+  }
+  header h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:26px;
+    font-weight:700;
+    margin:6px 0 2px;
+    letter-spacing:-0.01em;
+  }
+  header .sub{
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+
+  .scan-zone{ padding:16px 16px 8px; }
+  .viewfinder{
+    position:relative;
+    width:100%;
+    aspect-ratio: 4/3;
+    background:#0d0d0c;
+    overflow:hidden;
+    border-radius:var(--radius);
+  }
+  video, canvas{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  canvas{ display:none; }
+  .viewfinder .frame{
+    position:absolute;
+    inset:32% 10%;
+    border:2px solid var(--highlight);
+    border-radius:4px;
+    pointer-events:none;
+  }
+  .viewfinder .frame .tag{
+    position:absolute;
+    top:-20px; left:0;
+    font-size:10px;
+    color:var(--highlight);
+    letter-spacing:0.05em;
+    background:rgba(0,0,0,0.5);
+    padding:2px 5px;
+  }
+  .cam-status{
+    position:absolute;
+    bottom:8px; left:8px; right:8px;
+    font-size:11px;
+    color:#F4EFE4;
+    background:rgba(0,0,0,0.55);
+    padding:6px 8px;
+    border-radius:2px;
+    text-align:center;
+    letter-spacing:0.02em;
+  }
+  .cam-off{
+    width:100%; height:100%;
+    display:flex; align-items:center; justify-content:center;
+    color:#B8B2A6; font-size:12px; text-align:center; padding:20px;
+  }
+
+  .capture-row{
+    display:flex; gap:8px; margin-top:10px;
+  }
+  #captureBtn{
+    flex:1;
+    padding:12px;
+    font-size:13px;
+  }
+  .manual-toggle{
+    display:block;
+    text-align:center;
+    font-size:11px;
+    color:var(--ink-soft);
+    text-decoration:underline;
+    margin-top:10px;
+    background:none;
+  }
+  .manual-row{
+    display:none;
+    gap:8px;
+    margin-top:10px;
+  }
+  .manual-row.open{ display:flex; }
+  .manual-row input{
+    flex:1;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    padding:9px 10px;
+    border:1px solid var(--line);
+    background:#fff;
+    border-radius:var(--radius);
+  }
+
+  button{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    cursor:pointer;
+    border:none;
+    border-radius:var(--radius);
+  }
+  .btn-primary{
+    background:var(--ink);
+    color:var(--paper);
+    padding:9px 14px;
+    font-size:12px;
+    letter-spacing:0.03em;
+  }
+  .btn-primary:active{ transform: translateY(1px); }
+  .btn-primary:disabled{ opacity:0.5; cursor:default; }
+
+  .items{ padding:6px 22px 4px; min-height:60px; }
+  .empty-state{
+    text-align:center;
+    color:var(--ink-soft);
+    font-size:12px;
+    padding:30px 10px;
+    border:1px dashed var(--line);
+    margin-top:14px;
+    border-radius:var(--radius);
+  }
+  .item-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:10px;
+    padding:9px 0;
+    border-bottom:1px dotted var(--line);
+    font-size:13px;
+    animation: printIn 0.28s ease;
+  }
+  @keyframes printIn{
+    from{ opacity:0; transform:translateY(-6px);}
+    to{ opacity:1; transform:translateY(0);}
+  }
+  .item-row .name{
+    flex:1; min-width:0;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    color:var(--ink-soft);
+  }
+  .item-row .price{ font-weight:600; white-space:nowrap; }
+  .item-row .remove{
+    background:none; border:none; color:var(--stamp);
+    font-size:14px; line-height:1; padding:0 0 0 6px; cursor:pointer;
+  }
+
+  .total-block{
+    margin:8px 22px 0;
+    padding-top:14px;
+    border-top:2px dashed var(--line);
+  }
+  .total-line{
+    display:flex; justify-content:space-between;
+    font-size:12px; color:var(--ink-soft); padding:3px 0;
+  }
+  .total-line.grand{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:26px; font-weight:700; color:var(--ink);
+    padding-top:8px;
+  }
+
+  footer{ padding:18px 22px 24px; text-align:center; }
+  .barcode-deco{
+    height:26px;
+    background: repeating-linear-gradient(90deg, var(--ink) 0 2px, transparent 2px 5px, var(--ink) 5px 6px, transparent 6px 9px);
+    opacity:0.85;
+    margin-bottom:14px;
+  }
+  .footer-actions{ display:flex; gap:10px; }
+  .footer-actions button{ flex:1; padding:10px; font-size:12px; }
+  .btn-secondary{ background:var(--paper-dark); color:var(--ink); }
+
+  .modal-overlay{
+    position:fixed; inset:0;
+    background:rgba(20,18,15,0.5);
+    display:flex; align-items:flex-end; justify-content:center;
+    z-index:50;
+  }
+  .modal{
+    background:var(--paper);
+    width:100%; max-width:420px;
+    border-radius:12px 12px 0 0;
+    padding:20px 22px 26px;
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.25);
+  }
+  .modal .eyebrow{ font-size:11px; color:var(--ink-soft); letter-spacing:0.1em; }
+  .modal h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:15px; margin:4px 0 14px; color:var(--ink-soft); font-weight:500;
+  }
+  .modal label{
+    display:block; font-size:11px; color:var(--ink-soft);
+    margin-bottom:4px; margin-top:12px;
+  }
+  .modal input{
+    width:100%;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:15px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+  }
+  #modalPrice{ font-size:24px; font-weight:700; }
+  .modal-actions{ display:flex; gap:10px; margin-top:18px; }
+  .modal-actions button{ flex:1; padding:11px; font-size:13px; }
+
+  .thumb-preview{
+    width:100%;
+    max-height:110px;
+    object-fit:cover;
+    border-radius:4px;
+    margin-top:8px;
+    border:1px solid var(--line);
+  }
+
+  @media (prefers-reduced-motion: reduce){ .item-row{ animation:none; } }
+</style>
+</head>
+<body>
+
+<div class="receipt">
+  <header>
+    <div class="eyebrow">Sesión de compra</div>
+    <h1>Ticket</h1>
+    <div class="sub">Fotografiá el precio de la góndola y sumalo</div>
+  </header>
+
+  <div class="scan-zone">
+    <div class="viewfinder" id="viewfinder">
+      <video id="video" playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div class="frame"><span class="tag">encuadrá el precio acá</span></div>
+      <div class="cam-status" id="camStatus">Iniciando cámara…</div>
+    </div>
+    <div class="capture-row">
+      <button class="btn-primary" id="captureBtn" disabled>📷 Leer precio</button>
+    </div>
+    <button class="manual-toggle" id="manualToggle">o cargar el precio a mano</button>
+    <div class="manual-row" id="manualRow">
+      <input type="number" id="manualPrice" placeholder="0.00" inputmode="decimal" step="0.01">
+      <button class="btn-primary" id="manualAdd">Agregar</button>
+    </div>
+  </div>
+
+  <div class="items" id="items">
+    <div class="empty-state" id="emptyState">Todavía no sumaste nada.<br>El ticket está vacío.</div>
+  </div>
+
+  <div class="total-block">
+    <div class="total-line"><span>Artículos</span><span id="countLine">0</span></div>
+    <div class="total-line grand">
+      <span>Total</span>
+      <span>$<span id="grandTotal">0</span></span>
+    </div>
+  </div>
+
+  <footer>
+    <div class="barcode-deco"></div>
+    <div class="footer-actions">
+      <button class="btn-secondary" id="clearAll">vaciar</button>
+      <button class="btn-secondary" id="exportExcel">↓ descargar Excel</button>
+    </div>
+  </footer>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" style="display:none;">
+  <div class="modal">
+    <div class="eyebrow" id="modalEyebrow">Precio detectado</div>
+    <h2 id="modalHint">Revisá que el número esté bien antes de sumarlo</h2>
+    <img id="modalThumb" class="thumb-preview" style="display:none;">
+    <label for="modalPrice">Precio</label>
+    <input type="number" id="modalPrice" placeholder="0.00" inputmode="decimal" step="0.01">
+    <label for="modalNote">Nota (opcional)</label>
+    <input type="text" id="modalNote" placeholder="ej: rollo de cocina">
+    <div class="modal-actions">
+      <button class="btn-secondary" id="modalCancel">Cancelar</button>
+      <button class="btn-primary" id="modalConfirm">Sumar al ticket</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const items = [];
+  const itemsEl = document.getElementById('items');
+  const emptyState = document.getElementById('emptyState');
+  const grandTotalEl = document.getElementById('grandTotal');
+  const countLineEl = document.getElementById('countLine');
+  const camStatus = document.getElementById('camStatus');
+  const captureBtn = document.getElementById('captureBtn');
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+
+  const modalOverlay = document.getElementById('modalOverlay');
+  const modalEyebrow = document.getElementById('modalEyebrow');
+  const modalThumb = document.getElementById('modalThumb');
+  const modalPrice = document.getElementById('modalPrice');
+  const modalNote = document.getElementById('modalNote');
+
+  function formatMoney(n){
+    return n.toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  function render(){
+    itemsEl.innerHTML = '';
+    if(items.length === 0){
+      itemsEl.appendChild(emptyState);
+    } else {
+      items.forEach((it, idx) => {
+        const row = document.createElement('div');
+        row.className = 'item-row';
+        row.innerHTML = `
+          <div class="name">${it.note || 'artículo ' + (idx+1)}</div>
+          <div class="price">$${formatMoney(it.price)}</div>
+          <button class="remove" data-idx="${idx}" title="quitar">×</button>
+        `;
+        itemsEl.appendChild(row);
+      });
+    }
+    const total = items.reduce((acc, it) => acc + it.price, 0);
+    grandTotalEl.textContent = formatMoney(total);
+    countLineEl.textContent = items.length;
+  }
+
+  itemsEl.addEventListener('click', (e) => {
+    if(e.target.classList.contains('remove')){
+      const idx = parseInt(e.target.dataset.idx, 10);
+      items.splice(idx, 1);
+      render();
+    }
+  });
+
+  document.getElementById('clearAll').addEventListener('click', () => {
+    if(items.length && !confirm('¿Vaciar todo el ticket?')) return;
+    items.length = 0;
+    render();
+  });
+
+  // ---- Exportar a Excel ----
+  document.getElementById('exportExcel').addEventListener('click', () => {
+    if(items.length === 0){
+      alert('Todavía no hay nada para exportar.');
+      return;
+    }
+    const rows = items.map((it, idx) => ({
+      '#': idx + 1,
+      'Descripción': it.note || '',
+      'Precio': it.price,
+      'Hora': it.time
+    }));
+    rows.push({ '#': '', 'Descripción': 'TOTAL', 'Precio': items.reduce((a,i)=>a+i.price,0), 'Hora': '' });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{wch:4},{wch:28},{wch:12},{wch:10}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Ticket');
+    const fecha = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `ticket-${fecha}.xlsx`);
+  });
+
+  // ---- Modal ----
+  let pendingThumb = null;
+
+  function openModal(guessedPrice, thumbDataUrl){
+    modalPrice.value = guessedPrice || '';
+    modalNote.value = '';
+    pendingThumb = thumbDataUrl || null;
+    if(thumbDataUrl){
+      modalThumb.src = thumbDataUrl;
+      modalThumb.style.display = 'block';
+    } else {
+      modalThumb.style.display = 'none';
+    }
+    modalEyebrow.textContent = guessedPrice ? 'Precio detectado — confirmalo' : 'Cargá el precio';
+    modalOverlay.style.display = 'flex';
+    setTimeout(() => { modalPrice.focus(); modalPrice.select(); }, 60);
+  }
+  function closeModal(){ modalOverlay.style.display = 'none'; }
+
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  modalOverlay.addEventListener('click', (e) => { if(e.target === modalOverlay) closeModal(); });
+
+  document.getElementById('modalConfirm').addEventListener('click', () => {
+    const price = parseFloat(modalPrice.value);
+    if(isNaN(price) || price < 0){ modalPrice.focus(); return; }
+    items.push({
+      price,
+      note: modalNote.value.trim(),
+      time: new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'})
+    });
+    render();
+    closeModal();
+  });
+
+  // ---- Carga manual (sin cámara) ----
+  const manualToggle = document.getElementById('manualToggle');
+  const manualRow = document.getElementById('manualRow');
+  manualToggle.addEventListener('click', () => {
+    manualRow.classList.toggle('open');
+    if(manualRow.classList.contains('open')) document.getElementById('manualPrice').focus();
+  });
+  document.getElementById('manualAdd').addEventListener('click', () => {
+    const input = document.getElementById('manualPrice');
+    const price = parseFloat(input.value);
+    if(isNaN(price) || price < 0) return;
+    openModal(price, null);
+    input.value = '';
+  });
+
+  // ---- Extraer un precio del texto OCR ----
+  function extractPrice(rawText){
+    const cleaned = rawText.replace(/[^\d.,]/g, ' ');
+    const matches = cleaned.match(/[\d]{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|\d+/g);
+    if(!matches || matches.length === 0) return null;
+    // nos quedamos con el número más largo (suele ser el precio grande del cartel)
+    matches.sort((a,b) => b.replace(/[.,]/g,'').length - a.replace(/[.,]/g,'').length);
+    let best = matches[0];
+
+    const hasDot = best.includes('.');
+    const hasComma = best.includes(',');
+    let normalized;
+    if(hasDot && hasComma){
+      // el último separador es el decimal
+      if(best.lastIndexOf(',') > best.lastIndexOf('.')){
+        normalized = best.replace(/\./g, '').replace(',', '.');
+      } else {
+        normalized = best.replace(/,/g, '');
+      }
+    } else if(hasComma){
+      normalized = best.replace(',', '.');
+    } else {
+      normalized = best;
+    }
+    const value = parseFloat(normalized);
+    return isNaN(value) ? null : value;
+  }
+
+  // ---- Cámara ----
+  let stream = null;
+
+  async function startCamera(){
+    if(!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia){
+      camStatus.textContent = 'Este navegador no permite cámara acá. Usá "cargar el precio a mano".';
+      return;
+    }
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
+      video.srcObject = stream;
+      await video.play();
+      camStatus.textContent = 'Encuadrá el precio y tocá "Leer precio"';
+      captureBtn.disabled = false;
+    } catch(err){
+      camStatus.textContent = 'No se pudo acceder a la cámara (revisá permisos). Usá "cargar el precio a mano".';
+      console.error(err);
+    }
+  }
+
+  captureBtn.addEventListener('click', async () => {
+    if(!video.videoWidth) return;
+    captureBtn.disabled = true;
+    camStatus.textContent = 'Leyendo… un segundo';
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+    try{
+      const { data } = await Tesseract.recognize(dataUrl, 'spa+eng', {
+        tessedit_char_whitelist: '0123456789.,$'
+      });
+      const guessed = extractPrice(data.text || '');
+      openModal(guessed, dataUrl);
+    } catch(err){
+      console.error(err);
+      openModal(null, dataUrl);
+    } finally {
+      camStatus.textContent = 'Encuadrá el precio y tocá "Leer precio"';
+      captureBtn.disabled = false;
+    }
+  });
+
+  render();
+  startCamera();
+})();
+</script>
+
+</body>
+</html>
