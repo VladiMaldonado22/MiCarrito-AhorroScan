@@ -415,7 +415,7 @@
 <div class="receipt">
   <header>
     <button class="theme-btn" id="themeToggle" aria-label="Cambiar tema">🌙</button>
-    <div class="brand-badge">⚡ VladiScan v3.1</div>
+    <div class="brand-badge">⚡ VladiScan v3.2</div>
     <h1>VladiScan</h1>
     <div class="sub">Escaneá el precio en la góndola y sumá al instante</div>
   </header>
@@ -499,6 +499,7 @@
         <select id="modalPromo">
           <option value="none">Sin promo</option>
           <option value="3x2">3x2 (Llevás 3, pagás 2)</option>
+          <option value="4x3">4x3 (Llevás 4, pagás 3)</option>
           <option value="2da70">2da unidad al 70%</option>
           <option value="2da50">2da unidad al 50%</option>
           <option value="desc15">15% de descuento</option>
@@ -521,7 +522,7 @@
 (function(){
   const items = [];
   let budgetLimit = 0;
-  let editingIdx = null; // Para saber si estamos editando un producto existente
+  let editingIdx = null;
 
   // Modo Oscuro / Claro
   const themeToggle = document.getElementById('themeToggle');
@@ -568,6 +569,10 @@
       const payQty = Math.floor(qty / 3) * 2 + (qty % 3);
       return payQty * price;
     }
+    if(promo === '4x3'){
+      const payQty = Math.floor(qty / 4) * 3 + (qty % 4);
+      return payQty * price;
+    }
     if(promo === '2da70'){
       const pairs = Math.floor(qty / 2);
       const rem = qty % 2;
@@ -584,7 +589,7 @@
   }
 
   function getPromoText(promo){
-    const map = { '3x2':'3x2', '2da70':'2da 70%', '2da50':'2da 50%', 'desc15':'-15%', 'desc20':'-20%' };
+    const map = { '3x2':'3x2', '4x3':'4x3', '2da70':'2da 70%', '2da50':'2da 50%', 'desc15':'-15%', 'desc20':'-20%' };
     return map[promo] || null;
   }
 
@@ -749,9 +754,9 @@
     };
 
     if(editingIdx !== null){
-      items[editingIdx] = itemData; // Modifica el existente
+      items[editingIdx] = itemData;
     } else {
-      items.push(itemData); // Agrega uno nuevo
+      items.push(itemData);
     }
 
     render();
