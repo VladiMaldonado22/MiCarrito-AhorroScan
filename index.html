@@ -88,21 +88,6 @@
     position: relative;
   }
 
-  header .brand-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(99, 102, 241, 0.15);
-    color: var(--primary);
-    font-size: 11px;
-    font-weight: 700;
-    padding: 3px 10px;
-    border-radius: 20px;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    margin-bottom: 6px;
-  }
-
   header h1 {
     font-size: 30px;
     font-weight: 800;
@@ -268,7 +253,6 @@
 
   #captureBtn { flex: 1; }
 
-  /* Estilos botón linterna */
   .btn-torch {
     background: var(--box-bg);
     border: 1px solid var(--line);
@@ -539,11 +523,24 @@
 
 <script>
 (function(){
-  const items = [];
-  let budgetLimit = 0;
+  // --- MEJORA 1: Carga desde localStorage ---
+  const items = JSON.parse(localStorage.getItem('ahorroscan_items') || '[]');
+  let budgetLimit = parseFloat(localStorage.getItem('ahorroscan_budget') || '0');
   let editingIdx = null;
   let videoTrack = null;
   let torchOn = false;
+
+  const budgetMaxInput = document.getElementById('budgetMax');
+  if (budgetLimit > 0) {
+    budgetMaxInput.value = budgetLimit;
+  }
+
+  // --- MEJORA 2: Feedback Háptico (Vibración) ---
+  function triggerVibrate(pattern = 60) {
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate(pattern); } catch(e){}
+    }
+  }
 
   const themeToggle = document.getElementById('themeToggle');
   const savedTheme = localStorage.getItem('ahorroscan_theme') || 'light';
@@ -568,7 +565,6 @@
   const video = document.getElementById('video');
   const canvas = document.getElementById('canvas');
 
-  const budgetMaxInput = document.getElementById('budgetMax');
   const progressBar = document.getElementById('progressBar');
   const budgetPercent = document.getElementById('budgetPercent');
   const budgetRest = document.getElementById('budgetRest');
@@ -615,6 +611,10 @@
   }
 
   function render(){
+    // --- MEJORA 1: Guardado continuo en localStorage ---
+    localStorage.setItem('ahorroscan_items', JSON.stringify(items));
+    localStorage.setItem('ahorroscan_budget', budgetLimit.toString());
+
     itemsEl.innerHTML = '';
     let total = 0;
     let totalItemsCount = 0;
@@ -688,6 +688,7 @@
     const idx = parseInt(e.target.dataset.idx, 10);
     if(isNaN(idx)) return;
 
+    triggerVibrate(40);
     if(action === 'del'){
       items.splice(idx, 1);
     } else if(action === 'inc'){
@@ -704,12 +705,14 @@
 
   document.getElementById('clearAll').addEventListener('click', () => {
     if(items.length && !confirm('¿Vaciar todo el carrito?')) return;
+    triggerVibrate(80);
     items.length = 0;
     render();
   });
 
   document.getElementById('exportExcel').addEventListener('click', () => {
     if(items.length === 0){ alert('Carrito vacío.'); return; }
+    triggerVibrate(50);
     const rows = items.map((it, idx) => ({
       '#': idx + 1,
       'Descripción': it.note || 'Sin especificación',
@@ -767,6 +770,7 @@
     const qty = parseInt(modalQty.value, 10) || 1;
     if(isNaN(price) || price < 0){ modalPrice.focus(); return; }
 
+    triggerVibrate(70);
     const itemData = {
       price,
       qty,
@@ -795,6 +799,7 @@
     const input = document.getElementById('manualPrice');
     const price = parseFloat(input.value);
     if(isNaN(price) || price < 0) return;
+    triggerVibrate(50);
     openModal(price, null);
     input.value = '';
   });
@@ -812,6 +817,21 @@
     return isNaN(value) ? null : value;
   }
 
+  // --- MEJORA 3: Filtro de contraste para mejorar la lectura OCR ---
+  function preprocessCanvasForOCR(ctx, width, height) {
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const d = imgData.data;
+    // Binarización dinámica simple para aislar números del fondo
+    for (let i = 0; i < d.length; i += 4) {
+      const gray = 0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2];
+      const val = gray > 130 ? 255 : 0; // Umbral binarizado
+      d[i] = val;
+      d[i+1] = val;
+      d[i+2] = val;
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+
   async function startCamera(){
     if(!('mediaDevices' in navigator) || !navigator.mediaDevices.getUserMedia){
       camStatus.textContent = 'Navegador sin cámara. Usá la carga manual.';
@@ -824,11 +844,9 @@
       camStatus.textContent = 'Encuadrá el cartel y tocá "Leer Precio"';
       captureBtn.disabled = false;
 
-      // Guardar la pista de video para controlar la linterna
       videoTrack = stream.getVideoTracks()[0];
       const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
 
-      // Verificar si el dispositivo soporta linterna (torch)
       if ('torch' in capabilities) {
         torchBtn.style.display = 'flex';
         torchBtn.disabled = false;
@@ -838,11 +856,11 @@
     }
   }
 
-  // Evento para activar/desactivar la linterna
   torchBtn.addEventListener('click', async () => {
     if (!videoTrack) return;
     try {
       torchOn = !torchOn;
+      triggerVibrate(30);
       await videoTrack.applyConstraints({
         advanced: [{ torch: torchOn }]
       });
@@ -855,27 +873,34 @@
       }
     } catch (err) {
       console.error("Error al activar linterna:", err);
-      alert("No se pudo encender la linterna en este dispositivo.");
     }
   });
 
   captureBtn.addEventListener('click', async () => {
     if(!video.videoWidth) return;
+    triggerVibrate([40, 30, 40]);
     captureBtn.disabled = true;
-    camStatus.textContent = 'Escaneando número…';
+    camStatus.textContent = 'Procesando lectura…';
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
+    
+    // Captura inicial
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    const originalThumbUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+    // Aplicar contraste para Tesseract
+    preprocessCanvasForOCR(ctx, canvas.width, canvas.height);
+    const processedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
 
     try{
-      const { data } = await Tesseract.recognize(dataUrl, 'spa+eng', { tessedit_char_whitelist: '0123456789.,$' });
+      const { data } = await Tesseract.recognize(processedDataUrl, 'spa+eng', { tessedit_char_whitelist: '0123456789.,$' });
       const guessed = extractPrice(data.text || '');
-      openModal(guessed, dataUrl);
+      triggerVibrate(100);
+      openModal(guessed, originalThumbUrl);
     } catch(err){
-      openModal(null, dataUrl);
+      openModal(null, originalThumbUrl);
     } finally {
       camStatus.textContent = 'Encuadrá el cartel y tocá "Leer Precio"';
       captureBtn.disabled = false;
