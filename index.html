@@ -806,26 +806,22 @@
     openModal(price, null);
     input.value = '';
   });
+
 function extractPrice(rawText){
-    // 1. Agarramos el texto crudo del cartel y le barremos cualquier letra, dejando solo números, puntos y comas
-    let textoLimpio = rawText.replace(/[^\d.,]/g, '').trim();
-    if(!textoLimpio) return null;
+    const cleaned = rawText.replace(/[^\d.,]/g, ' ');
+    const matches = cleaned.match(/[\d]{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|\d+/g);
+    if(!matches || matches.length === 0) return null;
+    matches.sort((a,b) => b.replace(/[.,]/g,'').length - a.replace(/[.,]/g,'').length);
+    
+    // 1. Agarramos el primer elemento de la lista organizada
+    let best = matches[0];
 
-    // 🔥 FILTRO INTELIGENTE MILIMÉTRICO PARA ARGENTINA:
-    // Si el texto termina en un punto seguido de exactamente 3 números (Ej: 3.255 o 4.820)
-    // el sistema detecta de forma nativa que es un punto de miles y lo elimina.
-    if (/\.\d{3}$/.test(textoLimpio) && !textoLimpio.includes(',')) {
-        textoLimpio = textoLimpio.replace('.', '');
+    // 🔥 LA MEJORA CRUCIAL AQUÍ:
+    // Si el texto tiene un punto y tres números (como 2.520) y no tiene comas,
+    // el sistema detecta que el supermercado usó punto para los MILES y lo destruye.
+    if (/\.\d{3}$/.test(best) && !best.includes(',')) {
+        best = best.replace('.', '');
     }
-
-    // 2. Normalizamos la coma decimal si es que tuviera (Ej: 2520,50 -> 2520.50)
-    let normalized = textoLimpio.includes('.') && textoLimpio.includes(',') 
-      ? (textoLimpio.lastIndexOf(',') > textoLimpio.lastIndexOf('.') ? textoLimpio.replace(/\./g, '').replace(',', '.') : textoLimpio.replace(/,/g, ''))
-      : (textoLimpio.includes(',') ? textoLimpio.replace(',', '.') : textoLimpio);
-
-    const value = parseFloat(normalized);
-    return isNaN(value) ? null : value;
-}
 
     let normalized = best.includes('.') && best.includes(',') 
       ? (best.lastIndexOf(',') > best.lastIndexOf('.') ? best.replace(/\./g, '').replace(',', '.') : best.replace(/,/g, ''))
